@@ -1,0 +1,47 @@
+Successfully imported entmax_bisect.
+Using device: cuda
+Successfully loaded input.txt
+Dataset Stats: Vocab size: 65, Total tokens: 1115394
+Sweep Data Split: Train tokens: 1003854, Valid tokens: 111540
+
+--- Running Hyperparameter Sweep ---
+Sweep Config: {'learning_rate': 0.001, 'dropout': 0.1, 'eval_iters_scale_factor': 10, 'router_alpha': 1.5, 'router_temperature': 1.0, 'entmax_n_iter': 25, 'seed': 42, 'batch_size': 128, 'block_size': 128, 'max_iters': 5000, 'eval_interval': 100, 'n_embed': 128, 'n_head': 8, 'n_layer': 6, 'num_experts': 8, 'eval_iters': 500}
+Sweeping Alphas: [1.0, 1.5, 2.0, 2.5]
+Sweeping Temperatures: [0.5, 1.0, 10.0]
+Running 5 seeds per combination.
+
+----- Starting Sweep Run: alpha_1.0_temp_0.5_seed_42 -----
+Setting seed: 42
+Sweep Model Params: 6.76 M
+Traceback (most recent call last):
+  File "run_experiment.py", line 493, in <module>
+    losses, avg_metrics_val = estimate_loss(model, config, sweep_train_data, sweep_val_data)
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "run_experiment.py", line 387, in estimate_loss
+    logits, loss = model(xb, yb)
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "run_experiment.py", line 324, in forward
+    x = self.blocks(x)
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/nn/modules/container.py", line 219, in forward
+    input = module(input)
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "run_experiment.py", line 291, in forward
+    x = x + self.sparse_moe(self.ln2(x))
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/higoyal/AGT/moe38_venv/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "run_experiment.py", line 275, in forward
+    final_output.index_add_(0, token_indices, weighted_output)
+KeyboardInterrupt

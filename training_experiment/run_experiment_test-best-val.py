@@ -99,7 +99,6 @@ current_config = config_sweep  # Or config_full if you want to run that
 current_config["eval_iters"] = (current_config["max_iters"] // current_config["eval_interval"]) * current_config[
     "eval_iters_scale_factor"]
 custom_print(f"Using configuration: {current_config}")
-
 # --- Device Setup ---
 device = 'cuda' if torch.cuda.is_available() else (
     'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else 'cpu')
@@ -582,9 +581,9 @@ config_to_run_sweep_with = config_sweep  # Or config_full if sweeping its params
 config_to_run_sweep_with["eval_iters"] = (config_to_run_sweep_with["max_iters"] // config_to_run_sweep_with[
     "eval_interval"]) * config_to_run_sweep_with["eval_iters_scale_factor"]
 
-alphas_to_sweep = [1.0, 1.5, 2.0]  # Example, adjust as needed
+alphas_to_sweep = [0.5, 1, 1.5, 2.0, 2.5]  # Example, adjust as needed
 temperatures_to_sweep = [0.5, 1.0, 10.0]  # Example, adjust as needed
-num_seeds_per_combo = 1  # Number of seeds to run per hyperparameter combination
+num_seeds_per_combo = 3  # Number of seeds to run per hyperparameter combination
 base_seed_value = config_to_run_sweep_with["seed"]  # Use seed from chosen config
 
 custom_print(f"Sweep Config Being Used: {config_to_run_sweep_with}")
@@ -728,6 +727,8 @@ for alpha_val_sweep in alphas_to_sweep:
                     f"Warning: Could not create/update completion marker file {completed_marker_file}: {e_marker}")
 
             run_specific_end_time = time.time()
+            model_save_path = f"./models_out/model_{run_key_sweep}_{str(int(run_specific_start_time))}.pth"
+            torch.save(model.state_dict(), model_save_path)
             custom_print(
                 f"----- Sweep Run {run_key_sweep} completed in {run_specific_end_time - run_specific_start_time:.2f} seconds -----")
 
@@ -808,4 +809,4 @@ if log_file:
     except Exception as e:
         print(f"Error closing log file: {e}")
 
-custom_print("\n--- Experiment Script Finished ---")
+print("\n--- Experiment Script Finished ---")

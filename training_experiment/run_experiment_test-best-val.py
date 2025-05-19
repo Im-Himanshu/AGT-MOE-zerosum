@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+from datasets import load_dataset
+
 sns.set_theme(style="whitegrid", palette="muted", font_scale=0.8, rc={"figure.figsize": (8, 6)}, font="monospace",
               context="notebook", color_codes=True)
 from datetime import datetime
@@ -63,7 +65,8 @@ config_base = {
     "router_alpha": 1.5,
     "router_temperature": 1.0,
     "entmax_n_iter": 25,
-    "seed": 42
+    "seed": 42,
+    "dataset": "tinyshakespeare",  # Change to "wikitext" for WikiText dataset
 }
 
 # --- Sweep Configuration () ---
@@ -114,39 +117,86 @@ if not os.path.exists(data_file):
         f"E.g., from: https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt")
     exit()
 
-try:
-    with open(data_file, 'r', encoding='utf-8') as f:
-        text = f.read()
-    custom_print(f"Successfully loaded {data_file}")
 
-    chars = sorted(list(set(text)))
-    full_vocab_size = len(chars)
-    stoi = {ch: i for i, ch in enumerate(chars)}
-    itos = {i: ch for i, ch in enumerate(chars)}
+def load_shakespeare_dataset():
+    try:
+        with open(data_file, 'r', encoding='utf-8') as f:
+            text = f.read()
+        custom_print(f"Successfully loaded {data_file}")
 
-    encode = lambda s: [stoi[c] for c in s if c in stoi]
-    decode = lambda l: ''.join([itos[i] for i in l if i in itos])
+        chars = sorted(list(set(text)))
+        full_vocab_size = len(chars)
+        stoi = {ch: i for i, ch in enumerate(chars)}
+        itos = {i: ch for i, ch in enumerate(chars)}
 
-    data = torch.tensor(encode(text), dtype=torch.long)
-    custom_print(f"Dataset Stats: Vocab size: {full_vocab_size}, Total tokens: {len(data)}")
+        encode = lambda s: [stoi[c] for c in s if c in stoi]
+        decode = lambda l: ''.join([itos[i] for i in l if i in itos])
 
-    # --- MODIFIED DATA SPLIT: 80% train, 10% val, 10% test ---
-    n = len(data)
-    n_train = int(0.8 * n)
-    n_val = int(0.1 * n)
-    # n_test is the remainder
+        data = torch.tensor(encode(text), dtype=torch.long)
+        custom_print(f"Dataset Stats: Vocab size: {full_vocab_size}, Total tokens: {len(data)}")
 
-    train_data = data[:n_train]
-    val_data = data[n_train: n_train + n_val]
-    test_data = data[n_train + n_val:]
-    # --- END MODIFIED DATA SPLIT ---
+        # --- MODIFIED DATA SPLIT: 80% train, 10% val, 10% test ---
+        n = len(data)
+        n_train = int(0.8 * n)
+        n_val = int(0.1 * n)
+        # n_test is the remainder
 
-    custom_print(
-        f"Data Split: Train tokens: {len(train_data)}, Valid tokens: {len(val_data)}, Test tokens: {len(test_data)}")
+        train_data = data[:n_train]
+        val_data = data[n_train: n_train + n_val]
+        test_data = data[n_train + n_val:]
+        # --- END MODIFIED DATA SPLIT ---
 
-except Exception as e:
-    custom_print(f"Error processing dataset file: {e}")
-    exit()
+        custom_print(
+            f"Data Split: Train tokens: {len(train_data)}, Valid tokens: {len(val_data)}, Test tokens: {len(test_data)}")
+        return train_data, val_data, test_data, full_vocab_size, stoi, itos
+    except Exception as e:
+        custom_print(f"Error processing dataset file: {e}")
+        exit()
+
+
+def load_wiki_dataset():
+    # --- Data Loading and Preprocessing (Salesforce/wikitext) ---
+    try:
+        # Load the dataset
+        ds = load_dataset("Salesforce/wikitext", "wikitext-103-raw-v1")
+
+        # Extract text from each split
+        train_text = [item['text'] for item in ds['train']]
+        val_text = [item['text'] for item in ds['validation']]
+        test_text = [item['text'] for item in ds['test']]
+
+        # Combine text into single strings
+        train_text = "\n".join(train_text)
+        val_text = "\n".join(val_text)
+        test_text = "\n".join(test_text)
+
+        # Build vocabulary and encoding/decoding functions
+        full_text = train_text + val_text + test_text
+        chars = sorted(list(set(full_text)))
+        full_vocab_size = len(chars)
+        stoi = {ch: i for i, ch in enumerate(chars)}
+        itos = {i: ch for i, ch in enumerate(chars)}
+
+        encode = lambda s: [stoi[c] for c in s if c in stoi]
+        decode = lambda l: ''.join([itos[i] for i in l if i in itos])
+
+        # Encode text into tensors
+        train_data = torch.tensor(encode(train_text), dtype=torch.long)
+        val_data = torch.tensor(encode(val_text), dtype=torch.long)
+        test_data = torch.tensor(encode(test_text), dtype=torch.long)
+
+        custom_print(f"Dataset Stats: Vocab size: {full_vocab_size}, Train tokens: {len(train_data)}, "
+                     f"Valid tokens: {len(val_data)}, Test tokens: {len(test_data)}")
+        return train_data, val_data, test_data, full_vocab_size, stoi, itos
+    except Exception as e:
+        custom_print(f"Error processing dataset: {e}")
+        exit()
+
+
+if current_config["dataset"] == "tinyshakespeare":
+    train_data, val_data, test_data, vocab_size, stoi, itos = load_shakespeare_dataset()
+elif current_config["dataset"] == "wikitext":
+    train_data, val_data, test_data, vocab_size, stoi, itos = load_wiki_dataset()
 
 
 # --- Model Definitions (Assuming these are the same as your original run_experiment.py) ---

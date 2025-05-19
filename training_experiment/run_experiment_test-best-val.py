@@ -148,7 +148,7 @@ def load_shakespeare_dataset():
 
         custom_print(
             f"Data Split: Train tokens: {len(train_data)}, Valid tokens: {len(val_data)}, Test tokens: {len(test_data)}")
-        return train_data, val_data, test_data, full_vocab_size, stoi, itos
+        return train_data, val_data, test_data, full_vocab_size, stoi, itos, full_vocab_size
     except Exception as e:
         custom_print(f"Error processing dataset file: {e}")
         exit()
@@ -187,16 +187,16 @@ def load_wiki_dataset():
 
         custom_print(f"Dataset Stats: Vocab size: {full_vocab_size}, Train tokens: {len(train_data)}, "
                      f"Valid tokens: {len(val_data)}, Test tokens: {len(test_data)}")
-        return train_data, val_data, test_data, full_vocab_size, stoi, itos
+        return train_data, val_data, test_data, full_vocab_size, stoi, itos, full_vocab_size
     except Exception as e:
         custom_print(f"Error processing dataset: {e}")
         exit()
 
 
 if current_config["dataset"] == "tinyshakespeare":
-    train_data, val_data, test_data, vocab_size, stoi, itos = load_shakespeare_dataset()
+    train_data, val_data, test_data, vocab_size, stoi, itos, full_vocab_size = load_shakespeare_dataset()
 elif current_config["dataset"] == "wikitext":
-    train_data, val_data, test_data, vocab_size, stoi, itos = load_wiki_dataset()
+    train_data, val_data, test_data, vocab_size, stoi, itos, full_vocab_size = load_wiki_dataset()
 
 
 # --- Model Definitions (Assuming these are the same as your original run_experiment.py) ---

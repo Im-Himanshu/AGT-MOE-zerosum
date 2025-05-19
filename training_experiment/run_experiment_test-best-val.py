@@ -135,7 +135,6 @@ try:
     n = len(data)
     n_train = int(0.8 * n)
     n_val = int(0.1 * n)
-    # n_test is the remainder
 
     train_data = data[:n_train]
     val_data = data[n_train: n_train + n_val]

@@ -74,7 +74,7 @@ config_sweep = {
     **config_base,
     "batch_size": 64,
     "block_size": 64,
-    "max_iters": 500,  # Reduced for quicker testing, was 5000
+    "max_iters": 3000,  # Reduced for quicker testing, was 5000
     "eval_interval": 20,  # Reduced for quicker testing, was 100
     "n_embed": 64,
     "n_head": 4,

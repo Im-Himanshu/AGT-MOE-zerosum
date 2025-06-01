@@ -11,6 +11,8 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+from datasets import load_dataset
+
 sns.set_theme(style="whitegrid", palette="muted", font_scale=0.8, rc={"figure.figsize": (8, 6)}, font="monospace",
               context="notebook", color_codes=True)
 from datetime import datetime
@@ -63,7 +65,8 @@ config_base = {
     "router_alpha": 1.5,
     "router_temperature": 1.0,
     "entmax_n_iter": 25,
-    "seed": 42
+    "seed": 42,
+    "dataset": "tinyshakespeare",  # Change to "wikitext" for WikiText dataset
 }
 
 # --- Sweep Configuration () ---
@@ -71,7 +74,7 @@ config_sweep = {
     **config_base,
     "batch_size": 64,
     "block_size": 64,
-    "max_iters": 500,  # Reduced for quicker testing, was 5000
+    "max_iters": 3000,  # Reduced for quicker testing, was 5000
     "eval_interval": 20,  # Reduced for quicker testing, was 100
     "n_embed": 64,
     "n_head": 4,
@@ -99,7 +102,6 @@ current_config = config_sweep  # Or config_full if you want to run that
 current_config["eval_iters"] = (current_config["max_iters"] // current_config["eval_interval"]) * current_config[
     "eval_iters_scale_factor"]
 custom_print(f"Using configuration: {current_config}")
-
 # --- Device Setup ---
 device = 'cuda' if torch.cuda.is_available() else (
     'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else 'cpu')
@@ -115,38 +117,86 @@ if not os.path.exists(data_file):
         f"E.g., from: https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt")
     exit()
 
-try:
-    with open(data_file, 'r', encoding='utf-8') as f:
-        text = f.read()
-    custom_print(f"Successfully loaded {data_file}")
 
-    chars = sorted(list(set(text)))
-    full_vocab_size = len(chars)
-    stoi = {ch: i for i, ch in enumerate(chars)}
-    itos = {i: ch for i, ch in enumerate(chars)}
+def load_shakespeare_dataset():
+    try:
+        with open(data_file, 'r', encoding='utf-8') as f:
+            text = f.read()
+        custom_print(f"Successfully loaded {data_file}")
 
-    encode = lambda s: [stoi[c] for c in s if c in stoi]
-    decode = lambda l: ''.join([itos[i] for i in l if i in itos])
+        chars = sorted(list(set(text)))
+        full_vocab_size = len(chars)
+        stoi = {ch: i for i, ch in enumerate(chars)}
+        itos = {i: ch for i, ch in enumerate(chars)}
 
-    data = torch.tensor(encode(text), dtype=torch.long)
-    custom_print(f"Dataset Stats: Vocab size: {full_vocab_size}, Total tokens: {len(data)}")
+        encode = lambda s: [stoi[c] for c in s if c in stoi]
+        decode = lambda l: ''.join([itos[i] for i in l if i in itos])
 
-    # --- MODIFIED DATA SPLIT: 80% train, 10% val, 10% test ---
-    n = len(data)
-    n_train = int(0.8 * n)
-    n_val = int(0.1 * n)
+        data = torch.tensor(encode(text), dtype=torch.long)
+        custom_print(f"Dataset Stats: Vocab size: {full_vocab_size}, Total tokens: {len(data)}")
 
-    train_data = data[:n_train]
-    val_data = data[n_train: n_train + n_val]
-    test_data = data[n_train + n_val:]
-    # --- END MODIFIED DATA SPLIT ---
+        # --- MODIFIED DATA SPLIT: 80% train, 10% val, 10% test ---
+        n = len(data)
+        n_train = int(0.8 * n)
+        n_val = int(0.1 * n)
+        # n_test is the remainder
 
-    custom_print(
-        f"Data Split: Train tokens: {len(train_data)}, Valid tokens: {len(val_data)}, Test tokens: {len(test_data)}")
+        train_data = data[:n_train]
+        val_data = data[n_train: n_train + n_val]
+        test_data = data[n_train + n_val:]
+        # --- END MODIFIED DATA SPLIT ---
 
-except Exception as e:
-    custom_print(f"Error processing dataset file: {e}")
-    exit()
+        custom_print(
+            f"Data Split: Train tokens: {len(train_data)}, Valid tokens: {len(val_data)}, Test tokens: {len(test_data)}")
+        return train_data, val_data, test_data, full_vocab_size, stoi, itos, full_vocab_size
+    except Exception as e:
+        custom_print(f"Error processing dataset file: {e}")
+        exit()
+
+
+def load_wiki_dataset():
+    # --- Data Loading and Preprocessing (Salesforce/wikitext) ---
+    try:
+        # Load the dataset
+        ds = load_dataset("Salesforce/wikitext", "wikitext-103-raw-v1")
+
+        # Extract text from each split
+        train_text = [item['text'] for item in ds['train']]
+        val_text = [item['text'] for item in ds['validation']]
+        test_text = [item['text'] for item in ds['test']]
+
+        # Combine text into single strings
+        train_text = "\n".join(train_text)
+        val_text = "\n".join(val_text)
+        test_text = "\n".join(test_text)
+
+        # Build vocabulary and encoding/decoding functions
+        full_text = train_text + val_text + test_text
+        chars = sorted(list(set(full_text)))
+        full_vocab_size = len(chars)
+        stoi = {ch: i for i, ch in enumerate(chars)}
+        itos = {i: ch for i, ch in enumerate(chars)}
+
+        encode = lambda s: [stoi[c] for c in s if c in stoi]
+        decode = lambda l: ''.join([itos[i] for i in l if i in itos])
+
+        # Encode text into tensors
+        train_data = torch.tensor(encode(train_text), dtype=torch.long)
+        val_data = torch.tensor(encode(val_text), dtype=torch.long)
+        test_data = torch.tensor(encode(test_text), dtype=torch.long)
+
+        custom_print(f"Dataset Stats: Vocab size: {full_vocab_size}, Train tokens: {len(train_data)}, "
+                     f"Valid tokens: {len(val_data)}, Test tokens: {len(test_data)}")
+        return train_data, val_data, test_data, full_vocab_size, stoi, itos, full_vocab_size
+    except Exception as e:
+        custom_print(f"Error processing dataset: {e}")
+        exit()
+
+
+if current_config["dataset"] == "tinyshakespeare":
+    train_data, val_data, test_data, vocab_size, stoi, itos, full_vocab_size = load_shakespeare_dataset()
+elif current_config["dataset"] == "wikitext":
+    train_data, val_data, test_data, vocab_size, stoi, itos, full_vocab_size = load_wiki_dataset()
 
 
 # --- Model Definitions (Assuming these are the same as your original run_experiment.py) ---
@@ -581,9 +631,9 @@ config_to_run_sweep_with = config_sweep  # Or config_full if sweeping its params
 config_to_run_sweep_with["eval_iters"] = (config_to_run_sweep_with["max_iters"] // config_to_run_sweep_with[
     "eval_interval"]) * config_to_run_sweep_with["eval_iters_scale_factor"]
 
-alphas_to_sweep = [1.0, 1.5, 2.0]  # Example, adjust as needed
+alphas_to_sweep = [0.5, 1, 1.5, 2.0, 2.5]  # Example, adjust as needed
 temperatures_to_sweep = [0.5, 1.0, 10.0]  # Example, adjust as needed
-num_seeds_per_combo = 1  # Number of seeds to run per hyperparameter combination
+num_seeds_per_combo = 3  # Number of seeds to run per hyperparameter combination
 base_seed_value = config_to_run_sweep_with["seed"]  # Use seed from chosen config
 
 custom_print(f"Sweep Config Being Used: {config_to_run_sweep_with}")
@@ -727,6 +777,8 @@ for alpha_val_sweep in alphas_to_sweep:
                     f"Warning: Could not create/update completion marker file {completed_marker_file}: {e_marker}")
 
             run_specific_end_time = time.time()
+            model_save_path = f"./models_out/model_{run_key_sweep}_{str(int(run_specific_start_time))}.pth"
+            torch.save(model.state_dict(), model_save_path)
             custom_print(
                 f"----- Sweep Run {run_key_sweep} completed in {run_specific_end_time - run_specific_start_time:.2f} seconds -----")
 
@@ -807,4 +859,4 @@ if log_file:
     except Exception as e:
         print(f"Error closing log file: {e}")
 
-custom_print("\n--- Experiment Script Finished ---")
+print("\n--- Experiment Script Finished ---")
